@@ -1,0 +1,2 @@
+comico downloader
+用来下载comico漫画里的付费章节
