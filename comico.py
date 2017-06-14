@@ -54,6 +54,7 @@ for n in range(b, e+1):
     # 获取标题
     title_div = soup.find(class_="comico-global-header__page-title-ellipsis")
     title = title_div.string
+    title.repalce('?','？')
     # 生成图片下载地址
     for div in divs:
         url = div.get('style')
