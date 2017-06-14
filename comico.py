@@ -18,7 +18,7 @@ targetlist = ['_001' + t for t in temp]
 targetlist0 = ['_002' + t for t in temp1]
 targetlist.extend(targetlist0)
 
-# 漫画编号 1 = relife
+# 漫画编号 1 = relife 2346 = 脫處大作戰 2353 = 我的意外美眉
 uid = 1
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) \
