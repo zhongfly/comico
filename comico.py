@@ -1,91 +1,137 @@
 # encoding:UTF-8
-# 依赖库：
-# requests
-# BeautifulSoup4
-# lxml
+import queue
+import lxml
+#以上均为用pyinstaller打包时需要加上的依赖
 import requests
-import urllib.request
 import os
 from bs4 import BeautifulSoup
-# 文件名变量部分（中间部分）
-targetlist = ['_001_001', '_001_002', '_001_003', '_001_004', '_001_005',
-              '_001_006', '_001_007', '_001_008', '_001_009', '_001_010',
-              '_001_011', '_001_012', '_001_013', '_001_014', '_001_015',
-              '_001_016', '_001_017', '_001_018', '_001_019', '_001_020',
-              '_002_021', '_002_022', '_002_023', '_002_024', '_002_025',
-              '_002_026', '_002_027', '_002_028', '_002_029', '_002_030',
-              '_002_031', '_002_032', '_002_033', '_002_034', '_002_035',
-              '_002_036', '_002_037', '_002_038', '_002_039', '_002_040'
-              ]
-# 获取漫画名并建立文件夹
-# 漫画编号 1 = relife 2346 = 脫處大作戰 2353 = 我的意外美眉
-uid = 1
+import zipfile
+from PIL import Image
+
+print('comico漫画下载\n作者：ishadows\n')
+s = requests.Session()
 headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) \
                     AppleWebKit/537.36 (KHTML, like Gecko) \
-                    Chrome/58.0.3029.110 Safari/537.36'
+                    Chrome/60.0.3112.90 Safari/537.36',
 }
-r = requests.get(r'http://www.comico.com.tw/%d/' % uid, headers=headers)
-content = r.text
-soup = BeautifulSoup(content, 'lxml')
-comic_name_div = soup.find(class_="article-hero05__ttl")
-comic_name = comic_name_div.string
-comic_dir = './%s' % comic_name
-print('将要开始下载漫画：%s' % comic_name)
-if os.path.isdir(comic_dir) == False:
-    os.mkdir(comic_dir)
-# 指定开始与结束的章节
-b = int(input('begin:'))
-e = int(input('end:'))
-while e < b:
-    print('输入错误！')
-    e = int(input('end:'))
-for n in range(b, e+1):
-    # 获取图片下载地址前半部分
-    target = []
-    divs = []
-    web = (r'http://www.comico.com.tw/%d/%d/' % (uid, n))
-    print('处理网页%s中' % web)
-    r = requests.get(web, headers=headers)
-    content = r.text
-    soup = BeautifulSoup(content, 'lxml')
-    test = soup.find(href="http://www.comico.com.tw/",
-                     class_="m-btn-top o-replacement")
-    if test == None:
-        divs = soup.find_all(class_="locked-episode__kv _lockedEpisodeKv")
-    else:
-        print('%s该页面不存在\n' % web)
-        continue
 
-    if divs == []:
-        print('%s为免费章节，跳过\n' % web)
-        continue
-    # 获取标题
-    title_div = soup.find(class_="comico-global-header__page-title-ellipsis")
-    title = title_div.string
-    title.replace('?', '？')
-    title.replace('!', '！')
-    # 生成图片下载地址
-    for div in divs:
-        url = div.get('style')
-        url = url[23:-83]
-    target = [url + x + '.jpg' for x in targetlist]
-    print('已获取图片地址')
-    # 建立文件夹
-    imgdir = './%s/%s' % (comic_name, title)
-    if os.path.isdir(imgdir) == False:
-        os.mkdir(imgdir)
-    # 下载图片
-    t = 1
-    for link in target:
-        try:
-            urllib.request.urlopen(link)
-        except urllib.error.URLError as e:
-            print('%s not exit' % link)
-            break
-        else:
-            path = r'%s/%d.jpg' % (imgdir, t)
-            urllib.request.urlretrieve(link, path)
-            t = t+1
-    print('已下载%s，共%d张图片\n' % (title, t-1))
-print('已完成所有下载!')
+#登录并保存正确的账号信息
+flag = 1
+while flag != None:
+	if os.path.isfile('login.txt') :
+		with open('login.txt','r') as f:
+			loginid = f.readline().strip()
+			password = f.readline().strip()
+#			print(loginid,password)
+	else:
+		loginid = input('电子邮箱：')
+		password = input('密码：')
+	print('\n开始尝试登录\n')
+	data = {
+				'autoLoginChk':'Y',
+				'loginid':loginid,
+				'password':password,
+				'nexturl':'http://www.comico.com.tw/index.nhn',
+	}	
+	r = s.post('https://id.comico.com.tw/login/login.nhn', data=data, headers=headers)
+	r = s.get("https://id.comico.com.tw/login/login.nhn")
+	soup = BeautifulSoup(r.text,'lxml')
+	#若登录失败，login.nhn返回一个js函数，成功便返回一个网页
+	flag = soup.find('body')
+	if flag == None:
+		with open('login.txt', 'w') as f:
+			f.write('%s\n%s' %(loginid,password))
+			print('登录成功\n')
+	else:
+		if os.path.isfile('login.txt') :
+			os.remove('login.txt')
+		print('登录失败,请重试！\n')
+
+#漫画代码为uid，relife的为1
+uid = 1
+print('说明：\n以第186话为例，网址是：http://www.comico.com.tw/1/193/ \n网址最后的数字 193 即为这话的网页代码\n如果只下载一话，则 开始与结束 的网页代码都填这一话的即可\n')
+b = int(input('开始网页代码:'))
+e = int(input('结束网页代码:'))
+while e < b:
+    print('输入错误！\n')
+    b = int(input('开始网页:'))
+    e = int(input('结束网页:'))
+
+for n in range(b, e+1):
+	r = s.get("http://www.comico.com.tw/%d/%d/" % (uid, n))
+	soup = BeautifulSoup(r.text,'lxml')
+
+	if soup.find(href="http://www.comico.com.tw/",class_="m-btn-top o-replacement") != None:		
+		print('http://www.comico.com.tw/%d/%d/ 页面不存在\n' % (uid, n))
+		continue
+
+	# 获取标题
+	title_div = soup.find(class_="comico-global-header__page-title-ellipsis")
+	title = title_div.string
+	#去除最后的空格
+	title.rstrip()
+	#避免半角问号导致文件夹无法命名
+	title.replace('?', '？')
+	title.replace('!', '！')
+
+	#检查章节是否解锁
+	if soup.find(class_="locked-episode__list-btn-item") != None:
+		print(soup.find(class_="locked-episode__list-btn-item"))
+		print(' 《%s》 无法下载\n' %title)
+		continue
+
+	#获取图片链接	
+	firstimg_div = soup.find(class_="comic-image__image")
+	firstimg_url = firstimg_div.get('src')
+	url = []
+	url.append("%s" %firstimg_url)
+
+	#提取在js中的图片链接
+	items = soup.find_all('script',limit=3)
+	string = str(items[2].string)
+	string = string.replace(']','[')
+	string = string.split("[")
+	string = string[1].replace("\r\n\t\r\n\t'","'\r\n\t")
+	string = string.replace("',\r\n\t'","'\r\n\t")
+	string = string.split("'\r\n\t")
+	url.extend(string[1:-1])
+	print('已获取 《%s》 的下载链接' %title)
+
+	# 建立文件夹
+	imgdir = './%s' % title
+	if os.path.isdir(imgdir) == False:
+	    os.mkdir(imgdir)
+
+	#创建压缩文件
+	zfile = zipfile.ZipFile("%s.zip" %title, "w", zipfile.zlib.DEFLATED)
+
+	imgpath = []
+
+	#下载图片并添加到压缩文件中
+	for i in url:
+		path = '%s/%s' % (imgdir, i[-74:-68])
+		imgpath.append(path)
+		r = s.get(i, stream=True)
+		if r.status_code == 200:
+		    with open(path, 'wb') as f:
+		        for chunk in r:
+		            f.write(chunk)
+		    zfile.write(path, os.path.basename(path), zipfile.ZIP_DEFLATED)
+	zfile.close()
+	print('已完成 《%s》 的下载' %title)
+
+	#拼接长图
+	images = map(Image.open, imgpath)
+	heights = [i.height for i in images]
+	total_height = sum(heights)
+	new_im = Image.new('RGB', (690, total_height))
+	y_offset = 0
+	for im in imgpath:
+		fromImage = Image.open(im)
+		new_im.paste(fromImage, (0,y_offset))
+		fromImage.close()
+		y_offset = y_offset+2000
+	new_im.save('%s.jpg' %title)
+	print('已拼接长图\n')
+print('所有下载任务已经完成')
