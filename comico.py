@@ -135,3 +135,4 @@ for n in range(b, e+1):
 	new_im.save('%s.jpg' %title)
 	print('已拼接长图\n')
 print('所有下载任务已经完成')
+input('按任意键退出')
