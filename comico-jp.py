@@ -83,7 +83,32 @@ for n in range(b, e+1):
 
    # 检查章节是否解锁
     if soup.find(class_="locked-episode__list-btn-item") != None:
+        # print(' 《%s》 无法下载\n' % title)
+        # continue
+        pay_data={
+        'titleNo':titleNo,
+        'articleNo':articleNo,
+        'paymentCode':'K',
+        'coinUseToken':'',
+        'productNo':'5',
+        'price':'10',
+        }
+        pay_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) \AppleWebKit/537.36 (KHTML, like Gecko) \Chrome/60.0.3112.90 Safari/537.36',
+        'DNT':'1',
+        'Host':'www.comico.jp',
+        'Origin':'http://www.comico.jp',
+        'Pragma':'no-cache',
+        'Referer':url,
+        'Upgrade-Insecure-Requests':'1',
+        }
+        s.post('http://www.comico.jp/consume/index.nhn',data=pay_data,headers=pay_headers)
+        r=s.get(url,data=data,headers=headers)
+        soup = BeautifulSoup(r.text, 'lxml')
+
+    if soup.find(class_="locked-episode__list-btn-item") != None:
         print(' 《%s》 无法下载\n' % title)
+#        print(r.text)
         continue
 
     # 获取图片链接
