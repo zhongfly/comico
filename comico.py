@@ -23,7 +23,6 @@ while flag != None:
         with open('login.txt', 'r') as f:
             loginid = f.readline().strip()
             password = f.readline().strip()
-#			print(loginid,password)
     else:
         loginid = input('电子邮箱：')
         password = input('密码：')
@@ -34,24 +33,31 @@ while flag != None:
         'password': password,
         'nexturl': 'http://www.comico.com.tw/index.nhn',
     }
-    r = s.post('https://id.comico.com.tw/login/login.nhn',data=data, headers=headers)
+    s.post('https://id.comico.com.tw/login/login.nhn',
+           data=data, headers=headers)
     r = s.get("https://id.comico.com.tw/login/login.nhn")
-    
+
     soup = BeautifulSoup(r.text, 'lxml')
     # 若登录失败，login.nhn返回一个js函数，成功便返回一个网页
     flag = soup.find('body')
     if flag == None:
-        with open('login.txt', 'w') as f:
-            f.write('%s\n%s' % (loginid, password))
-            print('登录成功\n')
+        if os.path.isfile('login.txt') == False:
+            with open('login.txt', 'w') as f:
+                f.write('%s\n%s' % (loginid, password))
+        print('登录成功\n')
     else:
         if os.path.isfile('login.txt'):
             os.remove('login.txt')
         print('登录失败,请重试！\n')
 
+r = s.get('http://www.comico.com.tw/consume/coin/publish.nhn',
+          data={'paymentCode': 'C', }, headers=headers)
+# {"result":{"coinUseToken":"3OcKoCqoRSd9uRVD47mk"}}
+coinUseToken = r.text[27:-3]
+
 # 漫画代码，relife的为1
 titleNo = '1'
-print('说明：\n以第186话为例，网址是：http://www.comico.com.tw/1/193/ \n网址最后的数字 193 即为这话的网页代码\n如果只下载一话，则 开始与结束 的网页代码都填这一话的即可\n')
+print('说明：\n以第186话为例，网址是：http://www.comico.com.tw/1/193/\n网址最后的数字 193 即为这话的网页代码\n如果只下载一话，则 开始与结束 的网页代码都填这一话的即可\n')
 b = int(input('开始网页代码:'))
 e = int(input('结束网页代码:'))
 while e < b:
@@ -60,37 +66,14 @@ while e < b:
     e = int(input('结束网页:'))
 
 for n in range(b, e+1):
-    articleNo=str(n)
+    articleNo = str(n)
     r = s.get("http://www.comico.com.tw/%s/%d/" % (titleNo, n))
     soup = BeautifulSoup(r.text, 'lxml')
 
-   # 检查章节是否解锁
-    if soup.find(class_="locked-episode__list-btn-item") != None:
-        pay_data={
-        'titleNo':titleNo,
-        'articleNo':articleNo,
-        'paymentCode':'K',
-        'coinUseToken':'',
-        'productNo':'5',
-        'price':'9',
-        'rentalPrice':'',
-        }
-        pay_headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) \AppleWebKit/537.36 (KHTML, like Gecko) \Chrome/60.0.3112.90 Safari/537.36',
-        'DNT':'1',
-        'Host':'www.comico.com.tw',
-        'Origin':'http://www.comico.com.tw',
-        'Pragma':'no-cache',
-        'Referer':'http://www.comico.com.tw/%s/%d/' % (titleNo, n),
-        'Upgrade-Insecure-Requests':'1',
-        }
-        s.post('http://www.comico.com.tw/consume/index.nhn',data=pay_data,headers=pay_headers)
-        r=s.get('http://www.comico.com.tw/%s/%d/' % (titleNo, n),data=data,headers=headers)
-        soup = BeautifulSoup(r.text, 'lxml')
-
-    if soup.find(class_="locked-episode__list-btn-item") != None:
-        print(' 《%s》 无法下载\n' % title)
-        continue
+    # 网页是否存在
+    if soup.find(id='main'):
+        print('www.comico.com.tw/%s/%d/ 网页不存在' % (titleNo, n))
+        break
 
     # 获取标题
     title_div = soup.find(class_="comico-global-header__page-title-ellipsis")
@@ -101,11 +84,40 @@ for n in range(b, e+1):
     title.replace('?', '？')
     title.replace('!', '！')
 
-    # 检查章节是否解锁
+   # 检查章节是否解锁
     if soup.find(class_="locked-episode__list-btn-item") != None:
-        print(soup.find(class_="locked-episode__list-btn-item"))
-        print(' 《%s》 无法下载\n' % title)
-        continue
+        # 是否可用专用阅读券
+        if soup.find(class_="locked-episode__list-btn-item _transparent") != None:
+            paymentCode = 'K'
+        # 是否可用通用阅读券，以上2项均否则为必须用coin购买的章节
+        elif soup.find(class_="locked-episode__list-btn-item o-hidden _transparent") != None:
+            paymentCode = 'MK'
+        # 是否使用coin购买
+        elif input('是否使用%scoins购买《%s》？【y/n】' % (soup.find_all('input')[-2]['value'], title)) == 'y':
+            paymentCode = 'C'
+        else:
+            print('《%s》无法下载' % title)
+            continue
+        pay_data = {
+            'titleNo': titleNo,
+            'articleNo': articleNo,
+            'paymentCode': paymentCode,  # K为专用阅读券，MK为通用阅读券，C为coin
+            'coinUseToken': coinUseToken,  # 使用coin时才需要
+            'productNo': soup.find_all('input')[-3]['value'],
+            'price': soup.find_all('input')[-2]['value'],
+            'rentalPrice': '',  # 用coin租用价格，一般能租用的都可以用阅读券，没必要
+        }
+        s.post('http://www.comico.com.tw/consume/index.nhn',
+               data=pay_data, headers=headers)
+        r = s.get('http://www.comico.com.tw/%s/%d/' %
+                  (titleNo, n), headers=headers)
+        soup = BeautifulSoup(r.text, 'lxml')
+        if soup.find(class_="locked-episode__list-btn-item") != None:
+            print(' 《%s》 无法下载\n' % title)
+            continue
+        else:
+            payment={'K':'专用阅读券','MK':'通用阅读券','C':'Coin'}
+            print('已使用%s解锁章节《%s》'%(payment[paymentCode],title))
 
     # 获取图片链接
     firstimg_div = soup.find(class_="comic-image__image")
@@ -160,5 +172,5 @@ for n in range(b, e+1):
         y_offset = y_offset+2000
     new_im.save('%s.jpg' % title)
     print('已拼接长图\n')
-print('所有下载任务已经完成')
+print('所有任务已经完成')
 input('按任意键退出')
