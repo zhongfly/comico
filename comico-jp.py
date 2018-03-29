@@ -48,11 +48,14 @@ while flag != None:
             os.remove('login-jp.txt')
         print('登录失败,请重试！\n')
 
+
 # 漫画代码为titleNo，relife的为2
 titleNo = '2'
-#print('说明：\n以第186话为例，网址是：http://www.comico.com.tw/1/193/ \n网址最后的数字 193 即为这话的网页代码\n如果只下载一话，则 开始与结束 的网页代码都填这一话的即可\n')
+print('说明：\n以第215话为例，网址是：http://www.comico.jp/detail.nhn?titleNo=2&articleNo=215 \narticleNo后的数字 215 即为这话的网页代码\n如果只下载一话，则 开始与结束 的网页代码都填这一话的即可\n')
 b = int(input('开始网页代码:'))
 e = int(input('结束网页代码:'))
+if e=='':
+    e=b
 while e < b:
     print('输入错误！\n')
     b = int(input('开始网页:'))
@@ -83,8 +86,6 @@ for n in range(b, e+1):
 
    # 检查章节是否解锁
     if soup.find(class_="locked-episode__list-btn-item") != None:
-        # print(' 《%s》 无法下载\n' % title)
-        # continue
         pay_data={
         'titleNo':titleNo,
         'articleNo':articleNo,
@@ -116,7 +117,7 @@ for n in range(b, e+1):
     img_list=[]
     for div in img_div:
         img_list.append(div['src'])
-
+    print('已获取 《%s》 的下载链接' % title)
     # 建立文件夹
     imgdir = './%s' % title
     if os.path.isdir(imgdir) == False:
@@ -126,10 +127,11 @@ for n in range(b, e+1):
     zfile = zipfile.ZipFile("%s.zip" % title, "w", zipfile.zlib.DEFLATED)
 
     imgpath = []
-
+    n=1
     # 下载图片并添加到压缩文件中
     for i in img_list:
-        path = '%s/%s' % (imgdir, i[-74:-68])
+        path = '{0}/{1:02}.jpg' .format (imgdir, n)
+        n=n+1
         imgpath.append(path)
         r = s.get(i, stream=True)
         if r.status_code == 200:
@@ -151,7 +153,10 @@ for n in range(b, e+1):
         new_im.paste(fromImage, (0, y_offset))
         fromImage.close()
         y_offset = y_offset+2000
-    new_im.save('%s.jpg' % title)
+    try:
+        new_im.save('%s.jpg' % title)
+    except Exception as e:
+        new_im.save('%s.png' % title)   
     print('已拼接长图\n')
 print('所有下载任务已经完成')
 input('按任意键退出')
