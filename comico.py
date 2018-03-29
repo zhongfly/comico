@@ -76,7 +76,7 @@ def get_comic(session, titleNo, articleNo):
     title_div = soup.find(class_="comico-global-header__page-title-ellipsis")
     title = title_div.string
     # 去除最后的空格，避免半角问号导致文件夹无法命名
-    title.rstrip().replace('?', '？').replace('!', '！')
+    title = title.rstrip().replace('?', '？').replace('!', '！')
 
     # 处理被锁章节，并解锁
     if soup.find(class_="locked-episode__list-btn-item") != None:
@@ -94,7 +94,6 @@ def get_comic(session, titleNo, articleNo):
             print('《%s》无法下载' % title)
             return False
 
-        global coinUseToken
         if paymentCode == 'C' and coinUseToken == '':
             r = session.get('http://www.comico.com.tw/consume/coin/publish.nhn',
                             data={'paymentCode': 'C', }, headers=headers)
@@ -138,7 +137,6 @@ def get_comic(session, titleNo, articleNo):
 
 def download(session, url, dir):
     img = os.path.join(dir, url[-74:-68])
-
     r = session.get(url, headers=headers, stream=True)
     if r.status_code == 200:
         with open(img, 'wb') as f:
@@ -151,9 +149,12 @@ def DownloadThread(q,session, dir):
         try:
             # 不阻塞的读取队列数据
             url = q.get_nowait()
+        except queue.Empty as e:
+            break
         except Exception as e:
-            break;
+            raise
         download(session,url,dir)
+        q.task_done()
 
 
 def imgzip(filename, dir):
@@ -177,8 +178,12 @@ def get_longpic(filename, dir):
         with Image.open(img) as f:
             new_img.paste(f, (0, y_offset))
         y_offset = y_offset+2000
-    new_img.save(os.path.join(dir, f'{filename}.jpg'))
-    print(f'已拼接长图{filename}.jpg\n')
+    try:
+        new_img.save(os.path.join(path, f'{filename}.jpg'))
+    except Exception as e:
+        new_img.save(os.path.join(path, f'{filename}.png'))
+    
+    print(f'已拼接长图:{filename}\n')
 
 
 def get_one(session, titleNo, articleNo):
@@ -205,7 +210,7 @@ def get_one(session, titleNo, articleNo):
     end=time.time()
     print('{}已下载，耗时{}'.format(title,end-start))
     imgzip(title, imgdir)
-    get_longpic(title, path)
+    get_longpic(title, imgdir)
     return True
 
 
