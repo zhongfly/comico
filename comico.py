@@ -79,21 +79,21 @@ def get_comic(session, titleNo, articleNo):
     title = title.rstrip().replace('?', '？').replace('!', '！')
 
     # 处理被锁章节，并解锁
-    if soup.find(class_="locked-episode__list-btn-item") != None:
-
+    if soup.find(class_="locked-episode__list-btn") != None:
+        lock_div=soup.find(class_="locked-episode__list-btn")
         # 是否可用专用阅读券
-        if soup.find(class_="locked-episode__list-btn-item _transparent") != None:
+        if lock_div.find(attrs={"data-payment-code": "K"}) != None:
             paymentCode = 'K'
-        # 是否可用通用阅读券，以上2项均否则为必须用coin购买的章节
-        elif soup.find(class_="locked-episode__list-btn-item o-hidden _transparent") != None:
-            paymentCode = 'MK'
+        # 是否可用POINT，以上2项均否则为必须用coin购买的章节
+        elif lock_div.find(attrs={"data-payment-code": "P"}) != None:
+            paymentCode = 'P'
         # 是否使用coin购买
-        elif input('是否使用%scoins购买《%s》？【y/n】' % (soup.find_all('input')[-2]['value'], title)) == 'y':
+        elif input('是否使用%scoins购买《%s》？【y/n】' % (soup.find_all('input')[-3]['value'], title)) == 'y':
             paymentCode = 'C'
         else:
             print('《%s》无法下载' % title)
             return False
-
+        global coinUseToken
         if paymentCode == 'C' and coinUseToken == '':
             r = session.get('http://www.comico.com.tw/consume/coin/publish.nhn',
                             data={'paymentCode': 'C', }, headers=headers)
@@ -104,21 +104,22 @@ def get_comic(session, titleNo, articleNo):
         pay_data = {
             'titleNo': titleNo,
             'articleNo': articleNo,
-            'paymentCode': paymentCode,  # K为专用阅读券，MK为通用阅读券，C为coin
+            'paymentCode': paymentCode,  # K为专用阅读券，P为Point，C为coin
             'coinUseToken': coinUseToken,  # 使用coin时才需要
-            'productNo': soup.find_all('input')[-3]['value'],
-            'price': soup.find_all('input')[-2]['value'],
+            'productNo': soup.find_all('input')[-4]['value'],
+            'price': soup.find_all('input')[-3]['value'],
             'rentalPrice': '',  # 用coin租用价格，一般能租用的都可以用阅读券，没必要
+            'pointRentalPrice':soup.find_all('input')[-1]['value'],
         }
         session.post('http://www.comico.com.tw/consume/index.nhn',
                      data=pay_data, headers=headers)
         r = session.get(f'http://www.comico.com.tw/{titleNo}/{articleNo}/', headers=headers)
         soup = BeautifulSoup(r.text, 'lxml')
-        if soup.find(class_="locked-episode__list-btn-item") != None:
+        if soup.find(class_="locked-episode__list-btn") != None:
             print(' 《%s》 无法下载\n' % title)
             return False
         else:
-            payment = {'K': '专用阅读券', 'MK': '通用阅读券', 'C': 'Coin'}
+            payment = {'K': '专用阅读券', 'P': 'Point', 'C': 'Coin'}
             print('已使用%s解锁章节《%s》' % (payment[paymentCode], title))
 
     # 获取图片链接
@@ -129,7 +130,7 @@ def get_comic(session, titleNo, articleNo):
     string = soup.find_all('script', limit=3)[2].text
     url.extend(pattern.findall(string))
     print('已获取 《%s》 的下载链接' % title)
-    comic={}
+    comic = {}
     comic['title'] = title
     comic['url'] = url
     return comic
